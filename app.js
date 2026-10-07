@@ -52,7 +52,7 @@
   const visibleRows = () => FILTERED.filter((r) => S.layers.mats.has(r.m));
 
   // ---------- ViewState conversion (2D zoom <-> 3D camera height) ----------
-  const EARTH_RES = 156543.03392; // m/px at zoom 0 (512px tiles) at equator
+  const EARTH_RES = 78271.517; // m/px at zoom 0, 512px tiles (MapLibre 기준), 적도
   // Cesium FOV 60°는 더 긴 변(가로)에 적용되므로 종횡비(aspect>=1)만큼 거리를 늘린다
   function zoomToRange(zoom, lat, hPx, aspect = 1) { const res = EARTH_RES * Math.cos(lat * Math.PI / 180) / Math.pow(2, zoom); return hPx * res * 0.866 * Math.max(1, aspect); }
   function rangeToZoom(range, lat, hPx, aspect = 1) { const res = (range / (0.866 * Math.max(1, aspect))) / hPx; return Math.log2(EARTH_RES * Math.cos(lat * Math.PI / 180) / res); }
@@ -109,6 +109,9 @@
       const v = new Cesium.Viewer(el, { baseLayer: new Cesium.ImageryLayer(this.provider(S.basemap)), animation: false, timeline: false, geocoder: false, homeButton: false, sceneModePicker: false, baseLayerPicker: false, navigationHelpButton: false, fullscreenButton: false, infoBox: false, selectionIndicator: false, shouldAnimate: false });
       this.viewer = v;
       v.scene.globe.depthTestAgainstTerrain = false;
+      v.scene.moon.show = false; v.scene.sun.show = false; v.scene.skyBox.show = false; v.scene.backgroundColor = Cesium.Color.fromCssColorString('#dde9f4');
+      v.scene.globe.baseColor = Cesium.Color.fromCssColorString('#cfe3f3');
+      v.scene.globe.showGroundAtmosphere = false;
       v.scene.screenSpaceCameraController.minimumZoomDistance = 30;
       this.points = v.scene.primitives.add(new Cesium.PointPrimitiveCollection());
       this.polyDS = new Cesium.CustomDataSource('polys'); this.colDS = new Cesium.CustomDataSource('cols'); this.lblDS = new Cesium.CustomDataSource('labels'); this.buoyDS = new Cesium.CustomDataSource('buoys');
@@ -156,7 +159,7 @@
       const rows = visibleRows();
       // points
       this.points.removeAll();
-      rows.forEach((r) => { const sel = S.selected && S.selected.code === r.code; this.points.add({ position: Cesium.Cartesian3.fromDegrees(r.lng, r.lat, 1), color: Cesium.Color.fromCssColorString(MAT_COLOR[r.m] || '#9bb0c3'), pixelSize: sel ? 14 : 6 + Math.min(Math.sqrt(r.area), 5), outlineColor: sel ? Cesium.Color.fromCssColorString('#2f7fed') : Cesium.Color.WHITE, outlineWidth: sel ? 4 : 1, id: r, disableDepthTestDistance: Number.POSITIVE_INFINITY }); });
+      rows.forEach((r) => { const sel = S.selected && S.selected.code === r.code; this.points.add({ position: Cesium.Cartesian3.fromDegrees(r.lng, r.lat, 1), color: Cesium.Color.fromCssColorString(MAT_COLOR[r.m] || '#9bb0c3'), pixelSize: sel ? 14 : 6 + Math.min(Math.sqrt(r.area), 5), outlineColor: sel ? Cesium.Color.fromCssColorString('#2f7fed') : Cesium.Color.WHITE, outlineWidth: sel ? 4 : 1, id: r, disableDepthTestDistance: Number.POSITIVE_INFINITY, scaleByDistance: sel ? undefined : new Cesium.NearFarScalar(3000, 1.0, 60000, 0.45) }); });
       // polygons
       this.polyDS.entities.removeAll();
       if (S.layers.poly) D.polygons.forEach((p) => { const c = Cesium.Color.fromCssColorString(MAT_COLOR[p.m] || '#ffb020'); this.polyDS.entities.add({ polygon: { hierarchy: Cesium.Cartesian3.fromDegreesArray(p.ring.flat()), material: c.withAlpha(0.3), outline: true, outlineColor: c, outlineWidth: 2 } }); });
@@ -200,7 +203,7 @@
   }
   function updateStatus() {
     const v = S.mode === '3d' ? (V3.getView() || S.view) : (V2.map ? V2.getView() : S.view);
-    const range = zoomToRange(v.zoom, v.lat, 600);
+    const range = zoomToRange(v.zoom, v.lat, 600, 1.3);
     $('#status').textContent = (S.mode === '2d' ? '2D' : S.mode === '3d' ? '3D' : '분할') + ' · ' + v.lat.toFixed(5) + ', ' + v.lng.toFixed(5) + ' · zoom ' + v.zoom.toFixed(1) + ' · 카메라 ' + (range > 1000 ? (range / 1000).toFixed(1) + ' km' : Math.round(range) + ' m') + ' · 방위 ' + Math.round(v.bearing) + '°';
   }
   function renderAll() { V2.render(); V3.render(); }

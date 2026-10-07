@@ -134,6 +134,22 @@ h1{font-family:var(--font-head);font-size:26px;margin:6px 0 4px;letter-spacing:-
 .toast.show{opacity:1;transform:none}
 footer{text-align:center;color:var(--muted);font-size:11px;padding:24px}
 
+/* responsive */
+@media (max-width:1400px){.grid{grid-template-columns:280px 1fr 280px}}
+@media (max-width:1200px){
+  .grid{grid-template-columns:1fr 1fr}
+  .viewer{grid-column:1 / -1;order:-1;min-height:520px}
+  .kpis{grid-template-columns:repeat(2,1fr)}
+  .kpi:nth-child(3){border-left:0}
+  .nav a{padding:0 10px}
+}
+@media (max-width:860px){
+  .nav{display:none}
+  .grid{grid-template-columns:1fr}
+  .page{padding:16px}
+  .list{max-height:360px}
+}
+
 /* cesium chrome off */
 .cesium-viewer-bottom,.cesium-viewer-toolbar,.cesium-viewer-animationContainer,.cesium-viewer-timelineContainer{display:none!important}
 .maplibregl-ctrl-attrib{font-size:10px}

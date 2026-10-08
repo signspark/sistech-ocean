@@ -223,8 +223,14 @@
     D.regions.filter((r) => D.centers.some((c) => c.regionId === r.regionId)).forEach((r) => $('#fRegion').insertAdjacentHTML('beforeend', `<option value="${r.regionId}">${r.regionName}</option>`));
     MATS_PRESENT.forEach((m) => $('#fMat').insertAdjacentHTML('beforeend', `<option value="${m}">${matName(m)}</option>`));
     ['#fFrom', '#fTo', '#fRegion', '#fEq', '#fMat'].forEach((s) => $(s).addEventListener('change', () => ($('#bQuery').disabled = false)));
-    $('#bQuery').addEventListener('click', () => { S.filter = { from: $('#fFrom').value, to: $('#fTo').value, region: $('#fRegion').value, eq: $('#fEq').value, mat: $('#fMat').value }; S.chip = 'all'; S.page = 1; S.selected = null; applyFilter(); refresh(); $('#bQuery').disabled = true; toast('✅ 탐지 ' + fmt(FILTERED.length) + '건을 조회했습니다.'); fitToFiltered(); });
-    $('#bReset').addEventListener('click', () => { $('#fFrom').value = '2026-07-08'; $('#fTo').value = '2026-10-08'; $('#fRegion').value = 'all'; $('#fEq').value = 'all'; $('#fMat').value = 'all'; $('#bQuery').click(); S.view = { ...HOME }; V2.setView(S.view, true); if (V3.ready) V3.setView(S.view, true); });
+    function runQuery(opts = {}) {
+      S.filter = { from: $('#fFrom').value, to: $('#fTo').value, region: $('#fRegion').value, eq: $('#fEq').value, mat: $('#fMat').value };
+      S.chip = 'all'; S.page = 1; S.selected = null; applyFilter(); refresh(); $('#bQuery').disabled = true;
+      toast((opts.reset ? '↻ 필터를 초기화했습니다. ' : '✅ ') + '탐지 ' + fmt(FILTERED.length) + '건을 조회했습니다.');
+      if (!opts.reset) fitToFiltered();
+    }
+    $('#bQuery').addEventListener('click', () => runQuery());
+    $('#bReset').addEventListener('click', () => { $('#fFrom').value = '2026-07-08'; $('#fTo').value = '2026-10-08'; $('#fRegion').value = 'all'; $('#fEq').value = 'all'; $('#fMat').value = 'all'; runQuery({ reset: true }); S.view = { ...HOME }; syncing = true; V2.setView(S.view, true); if (V3.ready) V3.setView(S.view, true); setTimeout(() => (syncing = false), 900); });
     $('#bCsv').addEventListener('click', () => {
       const rows = listRows();
       const csv = ['\ufeffID,조사일자,섬(지역),재질,면적(㎡),추정무게(ton),조사수단,차수,위도,경도', ...rows.map((r) => [r.code, r.date, regName(r.regionId), matName(r.m), r.area, r.weight, EQ_KO[r.eq] || r.eq, r.order + '차', r.lat, r.lng].join(','))].join('\n');
@@ -265,9 +271,11 @@
   function renderDetail() {
     const r = S.selected; const el = $('#detail');
     if (!r) { el.innerHTML = `<div class="phead"><h3>탐지 상세</h3></div><div class="empty"><div><div style="font-size:28px;color:#9cc8fa">⌖</div><b>탐지 건을 선택해 주세요</b>목록에서 행을 고르거나 지도(2D/3D)에서 점을 누르면 상세가 표시됩니다.</div></div>`; return; }
-    const img = `http://db.dms.it.kr/api/detections/${r.src}/${r.id}/image`;
+    // 원본 이미지는 http라 https 페이지에서 차단됨 → 이미지 프록시(wsrv.nl) 경유. 실서비스에서는 자체 API로 교체
+    const rawImg = `http://db.dms.it.kr/api/detections/${r.src}/${r.id}/image`;
+    const img = location.protocol === 'https:' ? 'https://wsrv.nl/?url=' + encodeURIComponent(rawImg) + '&w=640&output=jpg' : rawImg;
     el.innerHTML = `<div class="phead ph"><h3>탐지 상세</h3><span class="mono">${r.code}</span></div>
-      <div class="img"><img src="${img}" alt="탐지 이미지" onerror="this.parentNode.textContent='탐지 이미지 (원본 서버 연결 필요)'"></div>
+      <div class="img"><img src="${img}" alt="탐지 이미지" onerror="this.parentNode.textContent='탐지 이미지를 불러오지 못했습니다 (원본 서버 응답 없음)'"></div>
       <span class="tag mat">${matName(r.m)}</span>
       <div class="kv"><span>섬(지역)</span><b>${regName(r.regionId)}</b></div>
       <div class="kv"><span>쓰레기 종류</span><b>${r.m === 4 ? '부유 쓰레기' : '해안 쓰레기'}</b></div>
@@ -300,6 +308,12 @@
     $('#matLayerList').innerHTML = MATS_PRESENT.map((m) => `<label><input type="checkbox" data-m="${m}" checked><span class="dot" style="background:${MAT_COLOR[m]}"></span>${matName(m)}<span class="cnt" id="mc${m}"></span></label>`).join('');
     $('#matLayerList').querySelectorAll('input').forEach((i) => i.addEventListener('change', () => { const m = +i.dataset.m; i.checked ? S.layers.mats.add(m) : S.layers.mats.delete(m); renderAll(); }));
     $('#legendBody').innerHTML = `<div class="sub" style="border:0;padding:0;margin-top:0">밀집도</div><div style="height:8px;border-radius:4px;background:linear-gradient(90deg,#fff0b4,#ff8a3d,#f2545b);margin:4px 0"></div><div style="display:flex;justify-content:space-between;font-size:10px;color:#7189a1"><span>낮음</span><span>높음</span></div><div class="sub">폴리곤(위성탐지)</div><label><span class="dot" style="background:#ffb02055;border:2px solid #ffb020"></span>탐지 영역</label><div class="sub">탐지 지점 (재질)</div>` + MATS_PRESENT.map((m) => `<label><span class="dot" style="background:${MAT_COLOR[m]}"></span>${matName(m)}</label>`).join('') + `<label><span class="dot" style="background:#173a5e"></span>부이</label>`;
+    // 팝업 외부 클릭 시 닫기
+    document.addEventListener('click', (e) => { if (e.target.closest('.pop') || e.target.closest('.tb')) return; document.querySelectorAll('.pop').forEach((x) => x.classList.remove('show')); document.querySelectorAll('.tb button').forEach((x) => x.classList.remove('on')); if (S.basemap === 'sat') $('#tBase').classList.add('on'); });
+    // 헤더 메뉴·버튼 (v0.1: 현장지도만 구현)
+    document.querySelectorAll('.nav a').forEach((a) => a.addEventListener('click', (e) => { e.preventDefault(); if (!a.classList.contains('on')) toast('ℹ️ “' + a.textContent.replace('▾', '').trim() + '” 메뉴는 다음 버전에서 제공됩니다.'); }));
+    $('#bGallery').addEventListener('click', () => toast('ℹ️ 컴포넌트 갤러리는 다음 버전에서 제공됩니다.'));
+    $('#bLogin').addEventListener('click', () => toast('ℹ️ 로그인은 다음 버전에서 제공됩니다. 공개 데이터는 로그인 없이 볼 수 있어요.'));
     document.addEventListener('keydown', (e) => { if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return; if (e.key === '2') setMode('2d'); if (e.key === '3') setMode('3d'); if (e.key.toLowerCase() === 's') setMode('split'); });
   }
   function refresh() {

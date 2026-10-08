@@ -1,4 +1,4 @@
-/* SISTECH OCEAN prototype v0.1
+/* SISTECH OCEAN prototype v0.2
    - 2D 뷰어: MapLibre GL + deck.gl   - 3D 뷰어: CesiumJS
    - 두 뷰어는 서로를 모르고, 아래 ViewerContract 형태(mount/getView/setView/render/flyTo/highlight)만 구현한다.
    - 공유 상태 S(필터·레이어·선택·뷰)만 넘기면 반대편 뷰어가 같은 장면을 복원한다. */
@@ -310,11 +310,10 @@
     $('#legendBody').innerHTML = `<div class="sub" style="border:0;padding:0;margin-top:0">밀집도</div><div style="height:8px;border-radius:4px;background:linear-gradient(90deg,#fff0b4,#ff8a3d,#f2545b);margin:4px 0"></div><div style="display:flex;justify-content:space-between;font-size:10px;color:#7189a1"><span>낮음</span><span>높음</span></div><div class="sub">폴리곤(위성탐지)</div><label><span class="dot" style="background:#ffb02055;border:2px solid #ffb020"></span>탐지 영역</label><div class="sub">탐지 지점 (재질)</div>` + MATS_PRESENT.map((m) => `<label><span class="dot" style="background:${MAT_COLOR[m]}"></span>${matName(m)}</label>`).join('') + `<label><span class="dot" style="background:#173a5e"></span>부이</label>`;
     // 팝업 외부 클릭 시 닫기
     document.addEventListener('click', (e) => { if (e.target.closest('.pop') || e.target.closest('.tb')) return; document.querySelectorAll('.pop').forEach((x) => x.classList.remove('show')); document.querySelectorAll('.tb button').forEach((x) => x.classList.remove('on')); if (S.basemap === 'sat') $('#tBase').classList.add('on'); });
-    // 헤더 메뉴·버튼 (v0.1: 현장지도만 구현)
-    document.querySelectorAll('.nav a').forEach((a) => a.addEventListener('click', (e) => { e.preventDefault(); if (!a.classList.contains('on')) toast('ℹ️ “' + a.textContent.replace('▾', '').trim() + '” 메뉴는 다음 버전에서 제공됩니다.'); }));
+    // 헤더 메뉴는 pages.js(해시 라우팅)가 담당 (v0.2)
     $('#bGallery').addEventListener('click', () => toast('ℹ️ 컴포넌트 갤러리는 다음 버전에서 제공됩니다.'));
     $('#bLogin').addEventListener('click', () => toast('ℹ️ 로그인은 다음 버전에서 제공됩니다. 공개 데이터는 로그인 없이 볼 수 있어요.'));
-    document.addEventListener('keydown', (e) => { if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return; if (e.key === '2') setMode('2d'); if (e.key === '3') setMode('3d'); if (e.key.toLowerCase() === 's') setMode('split'); });
+    document.addEventListener('keydown', (e) => { if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return; if (location.hash && !/^#\/map/.test(location.hash)) return; if (e.key === '2') setMode('2d'); if (e.key === '3') setMode('3d'); if (e.key.toLowerCase() === 's') setMode('split'); });
   }
   function refresh() {
     renderKpis(); renderChips(); renderList(); renderDetail(); renderAll();
@@ -327,5 +326,11 @@
   initFilters(); initViewerUI();
   V2.mount($('#map2d'));
   refresh(); updateStatus();
-  window.SO = { S, V2, V3, RECS, select, setMode };
+  window.SO = {
+    S, V2, V3, RECS, select, setMode,
+    // 다른 페이지(촬영·모델, AI 예측)에서 필터를 걸어 현장지도로 넘어올 때 사용
+    setFilter(f) { if (f.from) $('#fFrom').value = f.from; if (f.to) $('#fTo').value = f.to; if (f.region) $('#fRegion').value = f.region; if (f.eq) $('#fEq').value = f.eq; if (f.mat) $('#fMat').value = f.mat; $('#bQuery').disabled = false; $('#bQuery').click(); },
+    // 숨겨졌다 다시 표시될 때 지도 크기 재계산
+    resize() { if (V2.map) V2.map.resize(); if (V3.ready) V3.viewer.resize(); },
+  };
 })();
